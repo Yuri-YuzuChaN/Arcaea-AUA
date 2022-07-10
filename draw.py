@@ -236,12 +236,14 @@ class Data:
             name = 'rating_1.png'
         elif ptt < 10:
             name = 'rating_2.png'
-        elif  ptt < 11:
+        elif ptt < 11:
             name = 'rating_3.png'
-        elif  ptt < 12:
+        elif ptt < 12:
             name = 'rating_4.png'
-        elif  ptt < 12.5:
+        elif ptt < 12.5:
             name = 'rating_5.png'
+        elif ptt < 13:
+            name = 'rating_6.png'
         else:
             name = 'rating_6.png'
         return name
