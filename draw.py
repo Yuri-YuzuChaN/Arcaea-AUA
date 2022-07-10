@@ -245,7 +245,7 @@ class Data:
         elif ptt < 13:
             name = 'rating_6.png'
         else:
-            name = 'rating_6.png'
+            name = 'rating_7.png'
         return name
 
     @staticmethod
