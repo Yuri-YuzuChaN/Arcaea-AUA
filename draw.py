@@ -3,7 +3,7 @@ from time import strftime, localtime, time, mktime
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from datetime import datetime
 from io import BytesIO
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 from hoshino.typing import MessageSegment
 from hoshino.log import new_logger
 from hoshino.config import NICKNAME
@@ -352,45 +352,41 @@ class Data:
 
 class DrawText:
 
-    def __init__(self, 
-                image: Image.Image,
-                X: float,
-                Y: float,
-                size: int,
-                text: str,
-                font: str,
-                po: int = 2,
-                color: tuple = (255, 255, 255, 255),
-                stroke_width: int = 0,
-                stroke_fill: tuple = (0, 0, 0, 0),
-                anchor: str = 'lt') -> None:
+    def __init__(self, image: ImageDraw.ImageDraw, font: str) -> None:
         self._img = image
-        self._pos = (X, Y)
-        self._pos_2 = (X + po, Y + po)
-        self._text = str(text)
-        self._font = ImageFont.truetype(font, size)
-        self._color = color
-        self._stroke_width = stroke_width
-        self._stroke_fill = stroke_fill
-        self._anchor = anchor
+        self._font = font
 
-    def draw_text(self, multiline: Optional[bool] = False) -> Image.Image:
+    def draw(self,
+            pos_x: int,
+            pos_y: int,
+            size: int,
+            text: str,
+            color: Tuple[int, int, int, int] = (255, 255, 255, 255),
+            anchor: str = 'lt',
+            stroke_width: int = 0,
+            stroke_fill: Tuple[int, int, int, int] = (0, 0, 0, 0),
+            multiline: bool = False):
 
-        text_img = Image.new('RGBA', self._img.size, (255, 255, 255, 0))
-        draw_img = ImageDraw.Draw(text_img)
+        font = ImageFont.truetype(self._font, size)
         if multiline:
-            draw_img.multiline_text(self._pos, '\n'.join([i for i in self._text]), self._color, self._font, self._anchor, stroke_width=self._stroke_width, stroke_fill=self._stroke_fill)
+            self._img.multiline_text((pos_x, pos_y), '\n'.join([i for i in text]), color, font, anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
         else:
-            draw_img.text(self._pos, self._text, self._color, self._font, self._anchor, stroke_width=self._stroke_width, stroke_fill=self._stroke_fill)
-        return Image.alpha_composite(self._img, text_img)
+            self._img.text((pos_x, pos_y), str(text), color, font, anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
+    
+    def draw_partial_opacity(self,
+            pos_x: int,
+            pos_y: int,
+            size: int,
+            text: str,
+            po: int = 2,
+            color: Tuple[int, int, int, int] = (255, 255, 255, 255),
+            anchor: str = 'lt',
+            stroke_width: int = 0,
+            stroke_fill: Tuple[int, int, int, int] = (0, 0, 0, 0)):
 
-    def draw_partial_opacity(self) -> Image.Image:
-
-        text_img = Image.new('RGBA', self._img.size, (255, 255, 255, 0))
-        draw_img = ImageDraw.Draw(text_img)
-        draw_img.text(self._pos_2, self._text, (0, 0, 0, 128), self._font, self._anchor, stroke_width=self._stroke_width, stroke_fill=self._stroke_fill)
-        draw_img.text(self._pos, self._text, self._color, self._font, self._anchor, stroke_width=self._stroke_width, stroke_fill=self._stroke_fill)
-        return Image.alpha_composite(self._img, text_img)
+        font = ImageFont.truetype(self._font, size)
+        self._img.text((pos_x + po, pos_y + po), str(text), (0, 0, 0, 255), font, anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
+        self._img.text((pos_x, pos_y), str(text), color, font, anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
 
 def calc_rating(project: int, songrating: Optional[float] = 0, score: Optional[int] = 0, rating: Optional[float] = 0) -> Union[int, float]:
     if project == 0:
@@ -463,18 +459,22 @@ async def draw_info(arcid: Union[int, str]) -> str:
             im.alpha_composite(data.character_img, (773, 222))
             # ptt背景
             im.alpha_composite(data.ptt_img, (872, 338))
+
+            text_im = ImageDraw.Draw(im)
+            font = DrawText(text_im, data.Exo_Regular)
+            jpfont = DrawText(text_im, data.Kazesawa_Regular)
             # ptt
-            im = DrawText(im, 950, 415, 45, ptt, data.Exo_Regular, anchor='mm', stroke_width=1, stroke_fill=(0, 0, 0, 255)).draw_text()
+            font.draw(950, 415, 45, ptt, anchor='mm', stroke_width=1, stroke_fill=(0, 0, 0, 255))
             # arcname
-            im = DrawText(im, 537, 310, 44, data.arcname, data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(537, 310, 44, data.arcname, color=(0, 0, 0, 255), anchor='mm')
             # arcid
-            im = DrawText(im, 537, 375, 40, arcid, data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(537, 375, 40, 269441210, color=(0, 0, 0, 255), anchor='mm')
             # r10
-            im = DrawText(im, 1178, 285, 42, f'{data.r10:.4f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(1178, 285, 42, f'{data.r10:.4f}', color=(0, 0, 0, 255), anchor='mm')
             # maxptt
-            im = DrawText(im, 1450, 351, 36, f'{data.maxptt:.4f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(1450, 351, 36, f'{data.maxptt:.4f}', color=(0, 0, 0, 255), anchor='mm')
             # b30
-            im = DrawText(im, 1178, 416, 42, f'{data.b30:.4f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(1178, 416, 42, f'{data.b30:.4f}', color=(0, 0, 0, 255), anchor='mm')
             # 30个成绩
             bg_y = 500
             for num, i in enumerate(data.scorelist):
@@ -502,41 +502,41 @@ async def draw_info(arcid: Union[int, str]) -> str:
                 # 时间
                 im.alpha_composite(data.time_img, (bg_x + 245, bg_y + 205))
                 # 曲名
-                im = DrawText(im, bg_x + 290, bg_y + 35, 20, data.title, data.Kazesawa_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+                jpfont.draw(bg_x + 290, bg_y + 35, 20, data.title, color=(0, 0, 0, 255), anchor='mm')
                 # songrating
                 sr = f'{data.song_rating:.1f}'
                 if data.song_rating < 10:
-                    im = DrawText(im, bg_x + 55, bg_y + 110, 20, sr[0], data.Exo_Regular, anchor='mm').draw_text()
-                    im = DrawText(im, bg_x + 55, bg_y + 120, 20, sr[1], data.Exo_Regular, anchor='mm').draw_text()
-                    im = DrawText(im, bg_x + 55, bg_y + 140, 20, sr[2], data.Exo_Regular, anchor='mm').draw_text()
+                    font.draw(bg_x + 55, bg_y + 110, 20, sr[0], anchor='mm')
+                    font.draw(bg_x + 55, bg_y + 120, 20, sr[1], anchor='mm')
+                    font.draw(bg_x + 55, bg_y + 140, 20, sr[2], anchor='mm')
                 else:
-                    im = DrawText(im, bg_x + 55, bg_y + 100, 20, sr[0], data.Exo_Regular, anchor='mm').draw_text()
-                    im = DrawText(im, bg_x + 55, bg_y + 120, 20, sr[1], data.Exo_Regular, anchor='mm').draw_text()
-                    im = DrawText(im, bg_x + 55, bg_y + 130, 20, sr[2], data.Exo_Regular, anchor='mm').draw_text()
-                    im = DrawText(im, bg_x + 55, bg_y + 150, 20, sr[3], data.Exo_Regular, anchor='mm').draw_text()
+                    font.draw(bg_x + 55, bg_y + 100, 20, sr[0], anchor='mm')
+                    font.draw(bg_x + 55, bg_y + 120, 20, sr[1], anchor='mm')
+                    font.draw(bg_x + 55, bg_y + 130, 20, sr[2], anchor='mm')
+                    font.draw(bg_x + 55, bg_y + 150, 20, sr[3], anchor='mm')
                 # 名次
-                im = DrawText(im, bg_x + 530, bg_y + 35, 45, num + 1, data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+                font.draw(bg_x + 530, bg_y + 35, 45, num + 1, color=(0, 0, 0, 255), anchor='mm')
                 # 分数
-                im = DrawText(im, bg_x + 260, bg_y + 75, 45, f'{data.score:,}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='lm').draw_text()
+                font.draw(bg_x + 260, bg_y + 75, 45, f'{data.score:,}', color=(0, 0, 0, 255), anchor='lm')
                 # PURE 
-                im = DrawText(im, bg_x + 260, bg_y + 130, 30, 'P', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
-                im = DrawText(im, bg_x + 290, bg_y + 130, 25, data.p_count, data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
-                im = DrawText(im, bg_x + 355, bg_y + 130, 20, f'| +{data.sp_count}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+                font.draw(bg_x + 260, bg_y + 130, 30, 'P', color=(0, 0, 0, 255), anchor='ls')
+                font.draw(bg_x + 290, bg_y + 130, 25, data.p_count, color=(0, 0, 0, 255), anchor='ls')
+                font.draw(bg_x + 355, bg_y + 130, 20, f'| +{data.sp_count}', color=(0, 0, 0, 255), anchor='ls')
                 # FAR
-                im = DrawText(im, bg_x + 260, bg_y + 162, 30, 'F', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
-                im = DrawText(im, bg_x + 290, bg_y + 162, 25, data.far_count, data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+                font.draw(bg_x + 260, bg_y + 162, 30, 'F', color=(0, 0, 0, 255), anchor='ls')
+                font.draw(bg_x + 290, bg_y + 162, 25, data.far_count, color=(0, 0, 0, 255), anchor='ls')
                 # LOST
-                im = DrawText(im, bg_x + 260, bg_y + 194, 30, 'L', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
-                im = DrawText(im, bg_x + 290, bg_y + 194, 25, data.lost_count, data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+                font.draw(bg_x + 260, bg_y + 194, 30, 'L', color=(0, 0, 0, 255), anchor='ls')
+                font.draw(bg_x + 290, bg_y + 194, 25, data.lost_count, color=(0, 0, 0, 255), anchor='ls')
                 # Rating
-                im = DrawText(im, bg_x + 360, bg_y + 194, 25, f'Rating | {data.rating:.3f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+                font.draw(bg_x + 360, bg_y + 194, 25, f'Rating | {data.rating:.3f}', color=(0, 0, 0, 255), anchor='ls')
                 # time
-                im = DrawText(im, bg_x + 395, bg_y + 215, 20, playtime(data.play_time), data.Exo_Regular, anchor='mm').draw_text()
+                font.draw(bg_x + 395, bg_y + 215, 20, playtime(data.play_time), anchor='mm')
                 # new
                 if timediff(data.play_time) <= 7:
                     im.alpha_composite(data.new_img, (bg_x + 32, bg_y - 8))
 
-            im = DrawText(im, 900, 2990, 25, f'Draw Time {playtime(time() * 1000)}  |  Generated by {BotNickname}  |  Powered by project Arcaea', data.Exo_Regular, anchor='ms').draw_partial_opacity()
+            font.draw_partial_opacity(900, 2990, 25, f'Draw Time {playtime(time() * 1000)}  |  Generated by SakuraBOT  |  Powered by project Arcaea', anchor='ms')
             # save
             log.info(f'Ending Draw Piture -> {playtime(time() * 1000)}')
             base64str = img2b64(im)
@@ -617,36 +617,40 @@ async def draw_score(project: str, arcid: int, mode: int = 0, name: str = None, 
             im.alpha_composite(data.time_img, (562, 800))
             # 评价
             im.alpha_composite(data.rank_img, (900, 630))
+
+            text_im = ImageDraw.Draw(im)
+            font = DrawText(text_im, data.Exo_Regular)
+            jpfont = DrawText(text_im, data.Kazesawa_Regular)
             # 昵称
-            im = DrawText(im, 455, 105, 38, data.arcname, data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(455, 105, 38, data.arcname, color=(0, 0, 0, 255), anchor='mm')
             # 好友码
-            im = DrawText(im, 455, 165, 35, f'ArcID | {data.arcid}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(455, 165, 35, f'ArcID | {data.arcid}', color=(0, 0, 0, 255), anchor='mm')
             # ptt
-            im = DrawText(im, 702, 135, 50, ptt, data.Exo_Regular, stroke_width=1, stroke_fill=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(702, 135, 50, ptt, stroke_width=1, stroke_fill=(0, 0, 0, 255), anchor='mm')
             # rating
-            im = DrawText(im, 890, 105, 40, f'RATING', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
-            im = DrawText(im, 890, 165, 40, f'{data.rating:.3f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(890, 105, 40, f'RATING', color=(0, 0, 0, 255), anchor='mm')
+            font.draw(890, 165, 40, f'{data.rating:.3f}', color=(0, 0, 0, 255), anchor='mm')
             # 曲名
-            im = DrawText(im, 600, 300, 45, data.title, data.Kazesawa_Regular, color=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(600, 300, 45, data.title, color=(0, 0, 0, 255), anchor='mm')
             # 分数
-            im = DrawText(im, 600, 410, 100, f'{data.score:,}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='lm').draw_text()
+            font.draw(600, 410, 100, f'{data.score:,}', color=(0, 0, 0, 255), anchor='lm')
             # Pure
-            im = DrawText(im, 600, 550, 55, 'Pure', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            jpfont.draw(600, 550, 55, 'Pure', color=(0, 0, 0, 255), anchor='ls')
             # Player Pure
-            im = DrawText(im, 800, 550, 55, f'{data.p_count}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
-            im = DrawText(im, 960, 550, 40, f'| +{data.sp_count}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            font.draw(800, 550, 55, f'{data.p_count}', color=(0, 0, 0, 255), anchor='ls')
+            font.draw(960, 550, 40, f'| +{data.sp_count}', color=(0, 0, 0, 255), anchor='ls')
             # Far
-            im = DrawText(im, 600, 635, 55, 'Far', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            font.draw(600, 635, 55, 'Far', color=(0, 0, 0, 255), anchor='ls')
             # Player Far
-            im = DrawText(im, 800, 635, 55, data.far_count, data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            font.draw(800, 635, 55, data.far_count, color=(0, 0, 0, 255), anchor='ls')
             # Lost
-            im = DrawText(im, 600, 720, 55, 'Lost', data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            font.draw(600, 720, 55, 'Lost', color=(0, 0, 0, 255), anchor='ls')
             # Player Lost
-            im = DrawText(im, 800, 720, 55, data.lost_count, data.Exo_Regular, color=(0, 0, 0, 255), anchor='ls').draw_text()
+            font.draw(800, 720, 55, data.lost_count, color=(0, 0, 0, 255), anchor='ls')
             # Difficultys
-            im = DrawText(im, 306, 825, 40, f'{diffi.upper()} | {data.song_rating}', data.Exo_Regular, anchor='mm').draw_text()
+            font.draw(306, 825, 40, f'{diffi.upper()} | {data.song_rating}', anchor='mm')
             # Time
-            im = DrawText(im, 858, 825, 40, playtime(data.play_time), data.Exo_Regular, anchor='mm').draw_text()
+            font.draw(858, 825, 40, playtime(data.play_time), anchor='mm')
         
         elif randint == 2:
 
@@ -674,42 +678,46 @@ async def draw_score(project: str, arcid: int, mode: int = 0, name: str = None, 
             im.alpha_composite(data.clear_img, (16, 815))
             # rank
             im.alpha_composite(data.rank_img, (466, 1160))
+
+            text_im = ImageDraw.Draw(im)
+            font = DrawText(text_im, data.Exo_Regular)
+            jpfont = DrawText(text_im, data.Kazesawa_Regular)
             # 昵称
-            im = DrawText(im, 295, 60, 30, data.arcname, data.Exo_Regular, color=(0, 0, 0, 255), anchor='mt').draw_text()
+            font.draw(295, 60, 30, data.arcname, color=(0, 0, 0, 255), anchor='mt')
             # Rating
-            im = DrawText(im, 572, 60, 30, 'RATING', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mt').draw_text()
+            font.draw(572, 60, 30, 'RATING', color=(0, 0, 0, 255), anchor='mt')
             # arcid
-            im = DrawText(im, 295, 105, 20, f'ArcID | {data.arcid}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mt').draw_text()
+            font.draw(295, 105, 20, f'ArcID | {data.arcid}', color=(0, 0, 0, 255), anchor='mt')
             # rating
-            im = DrawText(im, 572, 105, 20, f'{data.rating:.3f}', data.Exo_Regular, color=(0, 0, 0, 255), anchor='mt').draw_text()
+            font.draw(572, 105, 20, f'{data.rating:.3f}', color=(0, 0, 0, 255), anchor='mt')
             # ptt
-            im = DrawText(im, 466, 87, 30, ptt, data.Exo_Regular, stroke_width=1, stroke_fill=(0, 0, 0, 255), anchor='mm').draw_text()
+            font.draw(466, 87, 30, ptt, stroke_width=1, stroke_fill=(0, 0, 0, 255), anchor='mm')
             # 难度
-            im = DrawText(im, 135, 240, 22, f'{diffi.upper()} | {data.song_rating}', data.Exo_Regular, anchor='lm').draw_text()
+            font.draw(135, 240, 22, f'{diffi.upper()} | {data.song_rating}', anchor='lm')
             # 曲名
-            im = DrawText(im, 356, 704, 40, data.title, data.Kazesawa_Regular, anchor='mt').draw_partial_opacity()
+            font.draw_partial_opacity(356, 704, 40, data.title, anchor='mt')
             # 曲师
-            im = DrawText(im, 356, 755, 20, data.artist, data.Kazesawa_Regular, anchor='mt').draw_partial_opacity()
+            font.draw_partial_opacity(356, 755, 20, data.artist, anchor='mt')
             # 分数
-            im = DrawText(im, 356, 925, 80, f'{data.score:,}', data.Exo_Regular, anchor='mt').draw_partial_opacity()
+            font.draw_partial_opacity(356, 925, 80, f'{data.score:,}', anchor='mt')
             # Pure
-            im = DrawText(im, 74, 1090, 60, 'Pure', data.Kazesawa_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(74, 1090, 60, 'Pure', anchor='ls')
             # Player Pure
-            im = DrawText(im, 356, 1090, 60, data.p_count, data.Exo_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(356, 1090, 60, data.p_count, anchor='ls')
             # Player SP
-            im = DrawText(im, 510, 1090, 35, f'| +{data.sp_count}', data.Exo_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(510, 1090, 35, f'| +{data.sp_count}', anchor='ls')
             # Far
-            im = DrawText(im, 74, 1175, 60, 'Far', data.Kazesawa_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(74, 1175, 60, 'Far', anchor='ls')
             # Player Far
-            im = DrawText(im, 356, 1175, 60, data.far_count, data.Exo_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(356, 1175, 60, data.far_count, anchor='ls')
             # Lost
-            im = DrawText(im, 74, 1255, 60, 'Lost', data.Kazesawa_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(74, 1255, 60, 'Lost', anchor='ls')
             # Player Lost
-            im = DrawText(im, 356, 1255, 60, data.lost_count, data.Exo_Regular, anchor='ls').draw_partial_opacity()
+            font.draw_partial_opacity(356, 1255, 60, data.lost_count, anchor='ls')
             # Playtime
-            im = DrawText(im, 356, 1340, 30, f'PlayTime | {playtime(data.play_time)}', data.Exo_Regular, anchor='mm').draw_partial_opacity()
+            font.draw_partial_opacity(356, 1340, 30, f'PlayTime | {playtime(data.play_time)}', anchor='mm')
             # info
-            im = DrawText(im, 356, 1400, 20, f'Generated by {BotNickname} | Powered by project Arcaea', data.Exo_Regular, anchor='ms').draw_partial_opacity()
+            font.draw_partial_opacity(356, 1400, 20, f'Generated by SakuraBOT | Powered by project Arcaea', anchor='ms')
 
         log.info(f'Ending Draw Piture -> {playtime(time() * 1000)}')
         base64str = img2b64(im)
