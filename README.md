@@ -12,8 +12,6 @@
 4. 在`config/__bot__.py` 模块列表中添加 `Arcaea`
 5. 重启BOT
 
-**该插件默认关闭，请手动开启**
-
 # 指令
 
 | 指令              | 功能      | 可选参数              | 说明                            |
@@ -24,5 +22,4 @@
 | arcbind           | 绑定      | [arcid]               | 绑定用户                        |
 | arcun             | 解绑      | 无                    | 解除绑定                        |
 | arcrd             | 随机曲目   | [定数] [难度]         | 随机一首该定数的曲目，例如：`arcrd 10.8`，`arcrd 10+`，`arcrd 9+ byd` |
-| archart/chart     | 查看指定谱面 | [songid] [difficulty] | 查看指定谱面                   |
 | arcset            | 修改成绩图 |[序号]                |   更改指令arcre成绩图             |
