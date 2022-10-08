@@ -1,31 +1,26 @@
 import sqlite3, os, traceback
-from typing import Union, List
+from typing import Union, List, Dict, Tuple
 
-from hoshino.log import new_logger
-
-SQL = os.path.expanduser('~/.hoshino/arcaea.db')
-SONGSQL = os.path.join(os.path.dirname(__file__), 'arcsong.db')
-logger = new_logger('Arcaea_SQL')
+from . import *
 
 class ARCSQL:
 
     def __init__(self):
-        os.makedirs(os.path.dirname(SQL), exist_ok=True)
-        self.makesql()
+        os.makedirs(os.path.dirname(USERSQL), exist_ok=True)
+        self.__MakeSQL__()
     
-    def arc_conn(self):
-        return sqlite3.connect(SQL)
+    def connect_user(self):
+        return sqlite3.connect(USERSQL)
 
-    def song_conn(self):
+    def connect_song(self) -> sqlite3.Connection:
         return sqlite3.connect(SONGSQL)
 
-    def makesql(self):
+    def __MakeSQL__(self):
         try:
-            self.arc_conn().execute('''CREATE TABLE USER(
+            self.connect_user().execute('''CREATE TABLE USER(
                 ID          INTEGER     PRIMARY KEY     NOT NULL,
                 QQID        INTEGER     NOT NULL,
-                ARCID       INTEGER     NOT NULL,
-                MODE        INTEGER     NOT NULL
+                ARCID       INTEGER     NOT NULL
             )''')
         except sqlite3.OperationalError:
             pass
@@ -38,7 +33,7 @@ class ARCSQL:
         使用QQ号 `qqid` 获取好友码 `arcid`
         '''
         try:
-            result = self.arc_conn().execute(f'SELECT ARCID, MODE FROM USER WHERE QQID = {qqid}').fetchall()
+            result = self.connect_user().execute(f'SELECT ARCID, MODE FROM USER WHERE QQID = {qqid}').fetchall()
             if not result:
                 return False
             else:
@@ -49,7 +44,7 @@ class ARCSQL:
 
     def update_mode(self, qqid: int, mode: int) -> bool:
         try:
-            conn = self.arc_conn()
+            conn = self.connect_user()
             conn.execute(f'UPDATE USER SET MODE = {mode} WHERE QQID = {qqid}')
             conn.commit()
             return True
@@ -60,7 +55,7 @@ class ARCSQL:
     # 绑定账号
     def bind_user(self, qqid: int, arcid: str) -> bool:
         try:
-            conn = self.arc_conn()
+            conn = self.connect_user()
             conn.execute(f'INSERT INTO USER VALUES (NULL, {qqid}, {arcid}, 0)')
             conn.commit()
             return True
@@ -71,7 +66,7 @@ class ARCSQL:
     # 删除账号
     def delete_user(self, qqid: int) -> bool:
         try:
-            conn = self.arc_conn()
+            conn = self.connect_user()
             conn.execute(f'DELETE FROM USER WHERE QQID = {qqid}')
             conn.commit()
             return True
@@ -79,63 +74,88 @@ class ARCSQL:
             logger.error(e)
             return False
 
-    # 查询歌曲
-    def song_info(self, songid: str, diff: str) -> Union[bool, tuple]:
-        try:
-            result = self.song_conn().execute(f'SELECT NAME_EN, NAME_JP, ARTIST, {diff} FROM SONG WHERE SONGID = "{songid}"').fetchall()
-            if not result:
-                return False
-            else:
-                return result[0]
-        except Exception as e:
-            logger.error(e)
-            return False
+    # 获取曲目
+    def get_song(self, songid: str) -> list:
+        song = self.connect_song().execute(f'SELECT * FROM CHARTS WHERE SONG_ID = "{songid}"').fetchall()
+        return song
 
-    def add_song(self, songid: str, name_en: str, name_jp: str, artist: str) -> bool:
-        try:
-            conn = self.song_conn()
-            conn.execute(f'INSERT INTO SONG VALUES ("{songid}", "{name_en}", "{name_jp}", "{artist}", -1, -1, -1, -1)')
-            conn.commit()
-            return True
-        except:
-            return False
+    def add_alias(self, songid: str, alias: str) -> bool:
+        conn = self.connect_song()
+        conn.execute(f'INSERT INTO ALIAS VALUES ("{songid}", "{alias}")')
+        conn.commit()
+        return True
 
-    def add_song_rating(self, songid: str, diff: str, rating: int) -> bool:
-        try:
-            conn = self.song_conn()
-            conn.execute(f'UPDATE SONG SET {diff} = {rating} WHERE SONGID = "{songid}"')
-            conn.commit()
-            return True
-        except:
-            return False
+    # 查询别名
+    def get_alias(self, name: str, songname: bool = False, onlyalias: bool = False) -> Union[list, Tuple[List[Dict[str, Union[str, List[str]]]], bool]]:
 
-    def get_song(self, rating: float, plus: bool = False, diff: str = None) -> Union[bool, List[tuple]]:
+        sqllist = [
+            f'SELECT * FROM CHARTS WHERE SONG_ID = "{name}"',
+            f'SELECT * FROM CHARTS WHERE NAME_EN = "{name}" OR NAME_JP = "{name}"',
+            f'SELECT * FROM ALIAS WHERE ALIAS = "{name}"',
+            f'SELECT * FROM ALIAS WHERE ALIAS LIKE "%{name}%"',
+            f'SELECT * FROM CHARTS WHERE SONG_ID LIKE "%{name}%" OR NAME_EN LIKE "%{name}%" OR NAME_JP LIKE "%{name}%"'
+        ]
+
+        if onlyalias:
+            data = self.connect_song().execute(sqllist[2]).fetchall()
+            if not data:
+                data = self.connect_song().execute(sqllist[3]).fetchall()
+            return list(set([i[0] for i in data]))
+        
+        for sql in sqllist:
+            data = self.connect_song().execute(sql).fetchall()
+            setdata = set([i[0] for i in data])
+            if data and len(setdata) == 1:
+                songlist = [data[0][0]]
+                if songname:
+                    result = self.connect_song().execute(
+                                f'SELECT * FROM ALIAS WHERE SID = "{data[0][0]}"').fetchall()
+                    songlist = [i[1] for i in result].append(result[0][0])
+                return songlist
+            elif len(setdata) > 1:
+                songlist = list(setdata)
+                if songname:
+                    sl = []
+                    for i in songlist:
+                        result = self.connect_song().execute(
+                                f'SELECT * FROM ALIAS WHERE SID = "{i}"').fetchall()
+                        sl.append({'songid' : i, 'alias': [i[1] for i in result]})
+                    songlist = sl, False
+                return songlist
+        return []
+
+    # 获取随机曲目
+    def get_random_song(self, rating: float, plus: bool = False, diff: int = None) -> Union[bool, List[tuple]]:
         try:
             if diff:
                 if plus:
-                    sql = f'SELECT * FROM SONG WHERE {diff} >= {rating + 7} AND {diff} < {rating + 10}'
+                    rmin, rmax = rating + 7, rating + 10
+                    sql = f'SELECT * FROM CHARTS WHERE RATING_CLASS = {diff} AND RATING >= {rmin} AND RATING < {rmax}'
                 else:
-                    sql = f'SELECT * FROM SONG WHERE {diff} >= {rating} AND {diff} < {rating + 7}'
+                    sql = f'SELECT * FROM CHARTS WHERE RATING_CLASS = {diff} AND RATING = {rating} AND RATING < {rating + 7}'
             elif plus:
                 rmin, rmax = rating + 7, rating + 10
-                sql = f'SELECT * FROM SONG WHERE (PST >= {rmin} AND PST < {rmax}) or (PRS >= {rmin} AND PRS < {rmax}) or (FTR >= {rmin} AND FTR < {rmax}) or (BYD >= {rmin} AND BYD < {rmax})'
+                sql = f'SELECT * FROM CHARTS WHERE RATING >= {rmin} AND RATING < {rmax}'
             elif rating >= 90:
                 if rating % 10 != 0:
-                    sql = f'SELECT * FROM SONG WHERE PST = {rating} or PRS = {rating} or FTR = {rating} or BYD = {rating}'
+                    sql = f'SELECT * FROM CHARTS WHERE RATING = {rating}'
                 else:
                     rmin, rmax = rating, rating + 7
-                    sql = f'SELECT * FROM SONG WHERE (PST >= {rmin} AND PST < {rmax}) or (PRS >= {rmin} AND PRS < {rmax}) or (FTR >= {rmin} AND FTR < {rmax}) or (BYD >= {rmin} AND BYD < {rmax})'
+                    sql = f'SELECT * FROM CHARTS WHERE RATING >= {rmin} AND RATING < {rmax}'
             else:
                 rmin, rmax = rating, rating + 10
-                sql = f'SELECT * FROM SONG WHERE (PST >= {rmin} AND PST < {rmax}) or (PRS >= {rmin} AND PRS < {rmax}) or (FTR >= {rmin} AND FTR < {rmax}) or (BYD >= {rmin} AND BYD < {rmax})'
+                sql = f'SELECT * FROM CHARTS WHERE RATING >= {rmin} AND RATING < {rmax}'
             
-            result = self.song_conn().execute(sql).fetchall()
+            result = self.connect_song().execute(sql).fetchall()
             if not result:
-                return False
+                return [False]
             else:
                 return result
         except Exception as e:
-            logger.error(e)
             return False
+
+    def get_all_music_info(self):
+        result = self.connect_song().execute('SELECT * FROM CHARTS').fetchall()
+        return result
 
 asql = ARCSQL()
