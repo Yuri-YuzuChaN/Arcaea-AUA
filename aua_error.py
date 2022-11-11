@@ -23,10 +23,12 @@ err = {
     '-22'  : '定数的范围小于开始查询的结果',
     '-23'  : '潜力值低于阈值30（7.0）',
     '-24'  : '需要更新Arcaea，请联系维护人员',
-    '-233' : '发生内部错误'
+    '-233' : '发生内部错误',
+    '-500' : '该好友码已绑定'
 }
 
 class ArcError(Exception):
 
     def __init__(self, value: str):
+        self.value = value
         self.error_str = err[value]

@@ -12,7 +12,9 @@ TOKEN = ''
 ENDPOINT = {
     'recent' : 'user/info',
     'best' : 'user/best',
-    'best30' : 'user/best30'
+    'best30' : 'user/best30',
+    'chart': 'assets/preview',
+    'alias': 'song/alias'
 }
 
 dir = os.path.join(os.path.dirname(__file__), 'img')
@@ -52,7 +54,10 @@ async def botarcapi(project: str, params: dict) -> dict:
     headers = {'Authorization': f'Bearer {TOKEN}'}
     timeout = aiohttp.ClientTimeout(total=180)
     async with aiohttp.request('GET', f'{AUAPI}/{ENDPOINT[project]}', params=params, headers=headers, timeout=timeout) as req:
-        data = await req.json()
+        if req.content_type == 'application/json':
+            data = await req.json()
+        else:
+            return await req.read()
         if data['status'] != 0 and data['status'] != -8 and data['status'] != -7:
             raise ArcError(str(data['status']))
         else:
