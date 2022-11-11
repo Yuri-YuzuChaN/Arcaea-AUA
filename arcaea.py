@@ -21,7 +21,7 @@ NOTBIND = '账号尚未绑定，请输入 arcbind ID(好友码或账户名) 进�
 
 difficulty = ['0', '1', '2', '3', 'pst', 'prs', 'ftr', 'byd', 'past', 'present', 'future', 'beyond']
 
-sv = Service('arcaea', manage_priv=priv.ADMIN, enable_on_default=True, visible=True, help_=help)
+sv = Service('Arcaea', manage_priv=priv.ADMIN, enable_on_default=True, visible=True, help_=help)
 
 class Alias:
 
